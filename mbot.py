@@ -14,7 +14,7 @@ from aiohttp import web
 # 🔐 Настройки
 TOKEN = os.getenv("BOT_TOKEN")
 OMDB_API_KEY = os.getenv("OMDB_API_KEY", "73603e14")
-PORT = int(os.environ.get("PORT", 8080))
+PORT = int(os.environ.get("PORT", 10000))
 
 logging.basicConfig(level=logging.INFO)
 
