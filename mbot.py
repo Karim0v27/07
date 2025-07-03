@@ -6,18 +6,20 @@ import yt_dlp
 
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
-    Application, ApplicationBuilder, CommandHandler,
-    MessageHandler, ContextTypes, filters
+    ApplicationBuilder, CommandHandler, MessageHandler,
+    ContextTypes, filters
 )
 from aiohttp import web
 
-# 🔐 Настройки
+# Настройки
 TOKEN = os.getenv("BOT_TOKEN")
 OMDB_API_KEY = os.getenv("OMDB_API_KEY", "73603e14")
 PORT = int(os.environ.get("PORT", 10000))
 
 logging.basicConfig(level=logging.INFO)
 
+
+# 🔁 Перевод текста
 def translate_to_en(text):
     try:
         response = requests.get(
@@ -27,9 +29,11 @@ def translate_to_en(text):
         )
         return response.json()[0][0][0]
     except Exception as e:
-        logging.error(f"❌ Ошибка перевода: {e}")
+        logging.error(f"Ошибка перевода: {e}")
         return text
 
+
+# 🎵 Загрузка музыки
 def download_audio(query):
     output_dir = "downloads"
     os.makedirs(output_dir, exist_ok=True)
@@ -51,13 +55,15 @@ def download_audio(query):
             path = os.path.join(output_dir, f"{title}.mp3")
             return path if os.path.exists(path) else None
     except Exception as e:
-        logging.error(f"❌ Ошибка загрузки: {e}")
+        logging.error(f"Ошибка загрузки: {e}")
         return None
 
+
+# 🎧 Музыка
 async def music(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = " ".join(context.args)
     if not query:
-        await update.message.reply_text("🎵 Введите название песни:/music название")
+        await update.message.reply_text("🎵 Введите название песни:\n/music название")
         return
     await update.message.reply_text("⏳ Загружаю музыку...")
     file_path = download_audio(query)
@@ -68,6 +74,8 @@ async def music(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("❌ Не удалось загрузить.")
 
+
+# 🎬 Фильмы
 def get_movie_info(title):
     try:
         title_en = translate_to_en(title)
@@ -77,9 +85,9 @@ def get_movie_info(title):
         data = res.json()
         if data.get("Response") == "True":
             return (
-                f"🎬 *{data['Title']}* ({data['Year']})\\n"
-                f"⭐ IMDb: {data.get('imdbRating')}\\n"
-                f"📖 {data.get('Plot')}\\n"
+                f"🎬 *{data['Title']}* ({data['Year']})\n"
+                f"⭐ IMDb: {data.get('imdbRating')}\n"
+                f"📖 {data.get('Plot')}\n"
                 f"[IMDb](https://www.imdb.com/title/{data['imdbID']})",
                 data.get("Poster")
             )
@@ -87,10 +95,11 @@ def get_movie_info(title):
         logging.error(f"OMDb ошибка: {e}")
     return None, None
 
+
 async def movie(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = " ".join(context.args)
     if not query:
-        await update.message.reply_text("🎬 Введите название фильма:/movie название")
+        await update.message.reply_text("🎬 Введите название фильма:\n/movie название")
         return
     await update.message.reply_text("🔍 Ищу фильм...")
     info, poster = get_movie_info(query)
@@ -102,6 +111,8 @@ async def movie(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("❌ Фильм не найден.")
 
+
+# 🎌 Аниме
 async def get_anime_info(title):
     title_en = translate_to_en(title)
     try:
@@ -121,10 +132,11 @@ async def get_anime_info(title):
         logging.error(f"Jikan ошибка: {e}")
     return None, None
 
+
 async def anime(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = " ".join(context.args)
     if not query:
-        await update.message.reply_text("🎌 Введите название аниме:/anime название")
+        await update.message.reply_text("🎌 Введите название аниме:\n/anime название")
         return
     await update.message.reply_text("🔍 Ищу аниме...")
     info, image = await get_anime_info(query)
@@ -136,21 +148,27 @@ async def anime(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("❌ Аниме не найдено.")
 
+
+# 👋 /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "👋 Привет! Я мультимедийный бот:"
-        "/music <песня>"
-         "/movie <фильм>"
-         "/anime <аниме>",
+        "👋 Привет! Я мультимедийный бот:\n"
+        "/music <песня>\n/movie <фильм>\n/anime <аниме>",
         reply_markup=ReplyKeyboardMarkup([['🎵 Музыка']], resize_keyboard=True)
     )
 
+
+# 🔘 Кнопка "Музыка"
 async def handle_music_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🎧 Напиши /music <название>")
 
-async def index(request):
-    return web.Response(text="✅ MediaGenie бот работает!")
 
+# 🌐 HTTP-сервер
+async def index(request):
+    return web.Response(text="✅ MediaGenie работает!")
+
+
+# 🚀 Старт
 async def main():
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
@@ -159,18 +177,17 @@ async def main():
     app.add_handler(CommandHandler("anime", anime))
     app.add_handler(MessageHandler(filters.Regex("🎵 Музыка"), handle_music_button))
 
-    # aiohttp веб-сервер для Render
+    # aiohttp сервер для Render
     web_app = web.Application()
     web_app.router.add_get("/", index)
-
-    # Запускаем и polling, и веб-сервер
     runner = web.AppRunner(web_app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", PORT)
     await site.start()
 
-    logging.info("✅ Бот запущен и слушает порт %s", PORT)
+    logging.info(f"✅ Web-сервер запущен на порту {PORT}")
     await app.run_polling()
+
 
 if __name__ == "__main__":
     import asyncio
